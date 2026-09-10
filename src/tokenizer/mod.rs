@@ -1,5 +1,5 @@
 
-use std::fs::{self, File};
+use std::fs::{File};
 use std::io::{BufReader};
 
 
@@ -79,7 +79,7 @@ impl Keyword {
 
 
 
-enum Token{
+pub enum Token{
 
     KeywordToken(Keyword)
 

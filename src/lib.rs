@@ -1,2 +1,2 @@
 pub mod tokenizer;
-pub mod handleFileOrDirGiven;
+pub mod handle_file_or_dir_given;
