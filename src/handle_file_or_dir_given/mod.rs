@@ -1,51 +1,72 @@
 
 use std::error::Error;
-use std::fs::{self, File, metadata};
-use std::io::{self, BufReader};
+use std::fs::{self, metadata};
 
-pub fn handle_file_or_dir(path_name:&str) -> Result<Vec<BufReader<File>>,Box< dyn Error>>{
+use std::io::{self};
+use std::path::{Path, PathBuf};
+
+pub struct FilesInPathBuf{
+    paths:Vec<PathBuf>,
+}
+
+impl FilesInPathBuf{
+
+    pub fn get_index_in_paths(&self,index:usize) -> &PathBuf{
+        if index > self.paths.len() - 1{
+            panic!("Error index out of bounds please provide a valid input")
+        }
+        &self.paths[index]
+    }
+    pub fn len_of(&self) -> usize{
+        self.paths.len()
+    }
+}
 
 
-    let md = metadata(path_name)?;
-  
+
+
+pub fn handle_file_or_dir<P: AsRef<Path>>(path_name:P) -> Result<FilesInPathBuf,Box< dyn Error>>{
+
+
+    let md = metadata(&path_name)?;
+    let path = path_name.as_ref();
+
+
     if md.is_file(){
-       Ok(handle_file(path_name)?)
+       Ok(
+        FilesInPathBuf { paths:vec![path.into()]  }
+       )
     }else if md.is_dir(){
-        Ok(handle_dir(path_name)?)
+        let result_of_files_from_dir  = handle_dir(path)?;
+        Ok(result_of_files_from_dir)
     }else{
         Err("path is neither a directory or file".into())
     }
-
+    
     
 
 }
 
 
-fn handle_file(path_name:&str) -> Result<Vec<BufReader<File>>,io::Error>{
-    let file = File::open(path_name)?;
-    let reader = BufReader::new(file);
 
-    Ok(vec![reader])
-
-}
-
-fn handle_dir(path_name:&str) -> Result<Vec<BufReader<File>>,io::Error>{
+fn handle_dir(path_name:&Path) -> Result<FilesInPathBuf,io::Error>{
     let paths = fs::read_dir(path_name)?;
 
-    let mut files:Vec<BufReader<File>> = vec![];
+    let mut paths_buf_files:Vec<PathBuf> = vec![];
 
     for path in paths{
         let entry = path?;
-
+  
         if entry.file_type()?.is_file(){
-            let file = File::open(entry.path())?;
-            let reader = BufReader::new(file);
-            files.push(reader);
+
+            paths_buf_files.push(entry.path());
         }
     }
 
 
-    Ok(files)
+    Ok(
+        FilesInPathBuf { paths:paths_buf_files }
+    )
 
 
 

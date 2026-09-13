@@ -1,6 +1,6 @@
 use std::env;
 
-use compiler::handle_file_or_dir_given::handle_file_or_dir;
+use compiler::{handle_file_or_dir_given::handle_file_or_dir, tokenizer::{JackTokenizer, Tokenizer}};
 
 fn main() {
         let os_args = env::args();
@@ -13,7 +13,32 @@ fn main() {
             panic!("PLEASE give correct amount of args");
         }
 
-        let file_readers = handle_file_or_dir(os_args[0].as_str());
+ 
 
-        println!("file_readers {file_readers:?}");
+        let file_readers = handle_file_or_dir(&os_args[1]);
+
+        let Ok(files) = file_readers else{
+            panic!("expected file name or directory name to be given");
+        };
+        
+
+        let Ok(mut tokenizer) = JackTokenizer::new(files) else{
+            panic!("Error")
+        };
+        loop{
+            tokenizer.advance_token();
+
+            if tokenizer.has_more_tokens(){
+
+            
+
+            
+            // println!("{:?}",tokenizer.current_token_type());
+            }else {
+                break;
+            }
+
+        }
+        
+        
 }
