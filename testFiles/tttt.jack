@@ -2,7 +2,7 @@ class Main {
     method void testStrings ( ) {
         do Output . printString ( "Hello_World" ) ;
         do Output . printString ( "" ) ;
-        do Output . printString ( "String with spaces inside it ) ;
+        do Output . printString ( "String with spaces inside it" ) ;
         do Output . printString ( "1234567890 !@#$%^&*()_+" ) ;
         return ;
     }

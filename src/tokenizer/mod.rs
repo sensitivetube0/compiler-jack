@@ -2,9 +2,10 @@
 // imports
 use std::error::Error;
 use std::fs::{File};
-use std::io::{self, BufRead, BufReader, Read};
-
+use std::io::{self, BufRead, BufReader,Write,Read};
+use std::path::Path;
 use crate::handle_file_or_dir_given::FilesInPathBuf;
+use std::fs::OpenOptions;
 
 
 
@@ -15,7 +16,7 @@ pub trait Tokenizer {
     fn advance_token(&mut self);
     fn has_more_tokens(&self) -> bool;
 
-    fn current_token_type(&self) -> &Option<Token>;
+    fn current_token_type(&self) -> Option<&Token>;
 }
 
 
@@ -100,6 +101,42 @@ pub enum Token{
 
 
 
+impl Token{
+
+    fn get_variant_name(&self) -> &'static str{
+
+        match self{
+            Token::KeywordToken(_) => "Keyword",
+            Token::SymbolToken(_) => "Symbol",
+            Token::IntegerToken(_) => "Integer",
+            Token::StringToken(_) => "String",
+            Token::IdentifierToken(_) => "Identifier",
+        }
+    }
+    fn get_value_from_token(&self) -> String{
+
+
+        match self{
+            Token::KeywordToken(keyword_token) => keyword_token.to_str().to_string(),
+            Token::SymbolToken(symbol_token) => symbol_token.to_str().to_string(),
+            Token::IntegerToken(Integer::Integer(val)) => val.to_string(),
+            Token::StringToken(StringConstant::String(val)) => val.to_string(),
+            Token::IdentifierToken(Identifier::SequenceOfChars(val)) => val.to_string(  ),
+        }
+
+
+
+
+
+    }
+
+}
+
+
+
+
+
+
 impl Keyword {
    
    // returns true is &str is a keyword false otherwise
@@ -157,6 +194,32 @@ impl Keyword {
             _             => None,
         }
     }
+    pub fn to_str(&self) -> &'static str {
+        match self {
+            Keyword::Class       => "class",
+            Keyword::Constructor => "constructor",
+            Keyword::Function    => "function",
+            Keyword::Method      => "method",
+            Keyword::Field       => "field",
+            Keyword::Static      => "static",
+            Keyword::Var         => "var",
+            Keyword::Int         => "int",
+            Keyword::Char        => "char",
+            Keyword::Boolean     => "boolean",
+            Keyword::Void        => "void",
+            Keyword::True        => "true",
+            Keyword::False       => "false",
+            Keyword::Null        => "null",
+            Keyword::This        => "this",
+            Keyword::Let         => "let",
+            Keyword::Do          => "do",
+            Keyword::If          => "if",
+            Keyword::Else        => "else",
+            Keyword::While       => "while",
+            Keyword::Return      => "return",
+        }
+    }
+    
 }
 
 
@@ -228,8 +291,30 @@ impl Symbol{
             "~" => Some(Self::Tilde),
              _ => None,
         }
+    }
 
-
+     pub fn to_str(&self) -> &'static str {
+        match self {
+            Self::LeftCurlyBracket  => "{",
+            Self::RightCurlyBracket => "}",
+            Self::LeftParentis      => "(",
+            Self::RightParentis     => ")",
+            Self::LeftSquareBracket => "[",
+            Self::RightSquareBracket=> "]",
+            Self::Period            => ".",
+            Self::Comma             => ",",
+            Self::SemiColon         => ";",
+            Self::Plus              => "+",
+            Self::Minus             => "-",
+            Self::Multiply          => "*",
+            Self::Divide            => "/",
+            Self::AmperSand         => "&",
+            Self::Pipe              => "|",
+            Self::LessThan          => "<",
+            Self::GreaterThan       => ">",
+            Self::Equals            => "=",
+            Self::Tilde             => "~",
+        }
     }
 
 
@@ -252,14 +337,13 @@ impl Integer{
 
     // converts &str into Option<Integer>
     pub fn from_str(s:&str) -> Option<Self>{
-
+    
         
     match s.parse::<i32>() {
         Ok(num) => Some(Integer::Integer(num)),
         Err(_) => None,
     }
-
-    }
+}
 
 }
 
@@ -317,7 +401,6 @@ impl Tokenizer for JackTokenizer{
 
     // advances token by setting self.current_token to next token found
     fn advance_token(&mut self){
-     
 
         // let mut current_char:char;
 
@@ -409,16 +492,18 @@ impl Tokenizer for JackTokenizer{
         }
 
         let token = self.create_token_from_str(&chars_for_token);
-        println!("token: {:?}",token);
-        println!("line: {}",self.line_number);
+        self.current_token = Some(token);
+        self.print_debug_xml_to_file();
+        println!("token: {:?}",self.current_token);
+       // println!("line: {}",self.line_number);
       
         return;
         
     }
 
     //returns current token
-    fn current_token_type(&self) -> &Option<Token>{
-        &self.current_token
+    fn current_token_type(&self) -> Option<&Token>{
+        self.current_token.as_ref()
     }
  
 
@@ -429,6 +514,38 @@ impl JackTokenizer{
 
 
 
+
+    fn print_debug_xml_to_file(&mut self){
+
+        
+        let print_debug_msg = "Error printing debug xml please try again at a later point";
+        let current_file = self.files.get_index_in_paths(self.next_file_to_read_idx - 1);
+        let file_name = current_file.file_name();
+
+        let Some(file_name) = file_name else{
+            panic!("{}",print_debug_msg);
+        };  
+        let file_stem = Path::new(file_name).file_stem().expect(print_debug_msg).to_str().expect(print_debug_msg);
+
+
+        let debug_file_location = file_stem.to_string() + ".xml";
+
+        let mut path = OpenOptions::new()
+                    .append(true)
+                    .create(true)
+                    .open(debug_file_location)
+                    .expect(print_debug_msg);
+        let current_token = self.current_token_type().expect("must advance token before trying to debug");
+        let current_token_type = current_token.get_variant_name();
+        let current_token_value = current_token.get_value_from_token();
+        println!("{}",current_token_type);
+        let msg_to_write = format!(
+            "<{}>{}</{}>\n",current_token_type,current_token_value,current_token_type
+        );
+        write!(path,"{}",msg_to_write);
+
+    }
+
     // terminates program on error
     fn error_occurred_tokenizing<T>(&mut self,msg:T) -> !
     where
@@ -437,8 +554,6 @@ impl JackTokenizer{
     eprintln!("{}",msg);
     std::process::exit(1);
     }
-
-
 
 
 
@@ -465,7 +580,9 @@ impl JackTokenizer{
         // if first char is " it means we should have a string Token
         Some('"') => {
             let Ok(key) = StringConstant::from_str(token_string)else{
-                self.error_occurred_tokenizing(format!("unexpected string denominator line: {}",self.line_number));
+                let current_file = self.files.get_index_in_paths(self.next_file_to_read_idx - 1);
+       
+                self.error_occurred_tokenizing(format!("file: {} unexpected string denominator line: {}",current_file.display(),self.line_number));
             };
             Token::StringToken(key)
         
