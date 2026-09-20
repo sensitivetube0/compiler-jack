@@ -1,6 +1,7 @@
 use std::env;
 
 use compiler::{handle_file_or_dir_given::handle_file_or_dir, tokenizer::{JackTokenizer, Tokenizer}};
+use compiler::parser::{Parser,self};
 
 fn main() {
         let os_args = env::args();
@@ -22,23 +23,14 @@ fn main() {
         };
         
 
-        let Ok(mut tokenizer) = JackTokenizer::new(files) else{
-            panic!("Error")
+        let Ok(tokenizer) = JackTokenizer::new(files) else{
+            panic!("Error initialing tokenizer")
         };
-        loop{
-            tokenizer.advance_token();
+        
+        let mut parser = parser::JackParser::new(tokenizer);
 
-            if tokenizer.has_more_tokens(){
+        parser.begin_compilation();
 
-            
-
-            
-            // println!("{:?}",tokenizer.current_token_type());
-            }else {
-                break;
-            }
-
-        }
         
         
 }

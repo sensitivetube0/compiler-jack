@@ -1,6 +1,7 @@
 
 // imports
 use std::error::Error;
+use std::ffi::OsStr;
 use std::fs::{File};
 use std::io::{self, BufRead, BufReader,Write,Read};
 use std::path::Path;
@@ -15,13 +16,15 @@ use std::fs::OpenOptions;
 pub trait Tokenizer {
     fn advance_token(&mut self);
     fn has_more_tokens(&self) -> bool;
-
+    fn skip_file(&mut self);
     fn current_token_type(&self) -> Option<&Token>;
 }
 
+pub trait CanCheckEq{
+    fn matches_token(&self,token_type:&Token) -> bool;
+}
 
-
-#[derive(Debug)]
+#[derive(Debug,PartialEq, Eq)]
 pub enum Keyword {
     Class,
     Constructor,
@@ -45,15 +48,35 @@ pub enum Keyword {
     While,
     Return,
 }
-#[derive(Debug)]
+
+impl CanCheckEq for Keyword {
+        fn matches_token(&self,token_type:&Token) -> bool {
+            match token_type {
+                Token::KeywordToken(actual_kw) => actual_kw == self,
+            _ => false,
+            }
+        }
+}
+
+#[derive(Debug,PartialEq,Clone)]
 pub enum Identifier{
     SequenceOfChars(String)
 }
 
+impl CanCheckEq for Identifier {
+
+    fn matches_token(&self,token_type:&Token) -> bool {
+            match token_type {
+                Token::IdentifierToken(actual_kw) => actual_kw == self,
+            _ => false,
+            }
+        }
+
+}
 
 
 
-#[derive(Debug)]
+#[derive(Debug,PartialEq, Eq)]
 pub enum Symbol{
 
 
@@ -78,13 +101,35 @@ pub enum Symbol{
     Tilde,
 }
 
-#[derive(Debug)]
+impl CanCheckEq for Symbol {
+    fn matches_token(&self,token_type:&Token) -> bool {
+            match token_type {
+                Token::SymbolToken(actual_kw) => actual_kw == self,
+            _ => false,
+            }
+        }
+}
+
+#[derive(Debug,PartialEq, Eq)]
 pub enum Integer{
     Integer(i32), // stores the integer
 }
 
+impl CanCheckEq for Integer {
 
-#[derive(Debug)]
+
+  
+    fn matches_token(&self,token_type:&Token) -> bool {
+            match token_type {
+                Token::IntegerToken(actual_kw) => actual_kw == self,
+            _ => false,
+            }
+        }
+
+}
+
+
+#[derive(Debug,PartialEq)]
 pub enum StringConstant{
     String(String), // needs to store the String constant
 }
@@ -384,19 +429,32 @@ pub struct JackTokenizer{
     files:FilesInPathBuf,
     next_file_to_read_idx:usize,
     current_file:BufReader<File>,
-    more_tokens_to_read:bool,
+    more_tokens_to_read:MoreTokensToRead,
     line_number:u32,
 }
 
+struct MoreTokensToRead{
 
+    more_tokens:bool,
+
+}
 
 
 impl Tokenizer for JackTokenizer{
 
-
+   
+    fn skip_file(&mut self){
+        if self.more_files_to_read(){
+        self.line_number = 1;
+        self.open_next_file();
+        }else{
+            self.more_tokens_to_read.more_tokens = false;
+            return;
+        }
+    }
     // self.more_tokens_to_read is only set to false when no more files or chars are available in all files given
     fn has_more_tokens(&self)-> bool {
-        self.more_tokens_to_read
+        self.more_tokens_to_read.more_tokens
     }
 
     // advances token by setting self.current_token to next token found
@@ -426,12 +484,8 @@ impl Tokenizer for JackTokenizer{
         
         // if we reach here it means peak_char returned none which means no chars left in file
         // we check if more files to read if so we open next one reset line number if not we set self.more_tokens_to_read = false and finish
-
-        if self.more_files_to_read(){
-        self.line_number = 1;
-        self.open_next_file();
-        }else{
-            self.more_tokens_to_read = false;
+        self.skip_file();
+        if !self.more_tokens_to_read.more_tokens{
             return;
         }
         }
@@ -515,6 +569,17 @@ impl JackTokenizer{
 
 
 
+    pub fn get_line_number(&self) -> u32{
+     self.line_number   
+    }
+    pub fn file_stem_current(&self) -> String {
+
+        let current_file = self.files.get_index_in_paths(self.next_file_to_read_idx -1);
+        
+
+        current_file.file_stem().unwrap().to_string_lossy().into_owned()
+    }
+
     fn print_debug_xml_to_file(&mut self){
 
         
@@ -538,11 +603,11 @@ impl JackTokenizer{
         let current_token = self.current_token_type().expect("must advance token before trying to debug");
         let current_token_type = current_token.get_variant_name();
         let current_token_value = current_token.get_value_from_token();
-        println!("{}",current_token_type);
+
         let msg_to_write = format!(
-            "<{}>{}</{}>\n",current_token_type,current_token_value,current_token_type
+            "<{}>{}</{}>\n",current_token_type.to_lowercase(),current_token_value,current_token_type.to_lowercase()
         );
-        write!(path,"{}",msg_to_write);
+        write!(path,"{}",msg_to_write).expect("Failed to print debug");
 
     }
 
@@ -654,7 +719,7 @@ impl JackTokenizer{
             files,
             next_file_to_read_idx:1,
             current_file:buf_reader,
-            more_tokens_to_read:true,
+            more_tokens_to_read:MoreTokensToRead { more_tokens: true },
             line_number:1,
         })
     }

@@ -1,9 +1,101 @@
-class Main {
+
+
+class tttt {
+    static int classCounter;
+    static boolean isInitialized;
+    
+    field int x, y;
+    field String label;
+
+    constructor tttt new(int ax, int ay, String aLabel) {
+        let x = ax;
+        let y = ay;
+        let label = aLabel;
+        
+        let classCounter = classCounter + 1;
+        let isInitialized = true;
+        
+        return this;
+    }
+
+    method void printDetails() {
+        do Output.printString(label);
+        do Output.printString(": (");
+        do Output.printInt(x);
+        do Output.printString(", ");
+        do Output.printInt(y);
+        do Output.printString(")");
+        do Output.println();
+        return;
+    }
+
+    method int updateCoordinates(int dx, int dy) {
+        if ((x + dx) > 0) {
+            let x = x + dx;
+        } else {
+            let x = 0;
+        }
+        
+        let y = y + dy;
+        return x + y;
+    }
+
+    function void testArrays() {
+        var Array arr;
+        var int i;
+        
+        let arr = Array.new(3);
+        let arr[0] = 10;
+        let arr[1] = 20;
+        let arr[2] = 30;
+        
+        let i = 0;
+        while (i < 3) {
+            do Output.printInt(arr[i]);
+            do Output.printString(" ");
+            let i = i + 1;
+        }
+        
+        do arr.dispose();
+        return;
+    }
+
+    function void main() {
+        var Main instance1, instance2;
+        class tttt {
     method void testStrings ( ) {
         do Output . printString ( "Hello_World" ) ;
         do Output . printString ( "" ) ;
         do Output . printString ( "String with spaces inside it" ) ;
         do Output . printString ( "1234567890 !@#$%^&*()_+" ) ;
         return ;
+    }
+}
+
+        let classCounter = 0;
+        let isInitialized = false;
+        
+        let instance1 = Main.new(5, 10, "Point A");
+        let instance2 = Main.new(12, 44, "Point B");
+        
+        do instance1.printDetails();
+        do instance2.printDetails();
+        
+        do Main.testArrays();
+        do Output.println();
+        
+        do Output.printString("Total Instances: ");
+        do Output.printInt(classCounter);
+        do Output.println();
+        
+        do instance1.dispose();
+        do instance2.dispose();
+        return;
+    }
+
+    method void dispose() {
+        do label.dispose();
+        do Memory.deAlloc(this);
+        return;
     }
 }
