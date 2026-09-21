@@ -135,7 +135,7 @@ pub enum StringConstant{
 }
 
 // holds Token of all the different enums
-#[derive(Debug)]
+#[derive(Debug,PartialEq)]
 pub enum Token{
     KeywordToken(Keyword),
     SymbolToken(Symbol),

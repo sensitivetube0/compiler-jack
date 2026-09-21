@@ -16,8 +16,8 @@ use crate::tokenizer::Token::{IdentifierToken,IntegerToken,KeywordToken,StringTo
 #[derive(Debug)]
 pub struct Class{
     class_name:tokenizer::Identifier,
-    class_var_dec:Vec<ClassVarDec>,
-    subroutine_dec:Option<SubRoutineDec>,
+    class_var_decs:Vec<ClassVarDec>,
+    subroutine_decs:Vec<SubRoutineDec>,
 }
 
 
@@ -75,23 +75,28 @@ pub struct SubRoutineDec{
 
 #[derive(Debug)]
 pub struct Parameters{
-    type_of:TypeOf,
-    var_name:tokenizer::Identifier,
+    type_of:Option<TypeOf>,
+    var_name:Option<tokenizer::Identifier>,
 }
 
 
 #[derive(Debug)]
-struct SubRoutineBody{
+pub struct SubRoutineBody{
     var_dec:VarDec,
     statements:Vec<Statements>
 }
 
 
 #[derive(Debug)]
-struct VarDec{
-    type_of:TypeOf,
+pub struct VarDec{
+    type_of:Option<TypeOf>,
     optional_more_vars:Vec<tokenizer::Identifier>
 }
+
+
+
+
+
 
 #[derive(Debug)]
 enum ReturnType{
@@ -176,13 +181,13 @@ pub trait Parser{
     fn compile_class(&mut self) -> Option<Class>;
     fn compile_class_var_dec(&mut self) -> Option<ClassVarDec>;
     fn compile_subroutine(&mut self) -> Option<SubRoutineDec>;
-    fn compile_subroutine_var_dec(&self);
-    fn compile_parameter_list(&mut self) -> Option<Parameters>;
-    fn compile_subroutine_body(&self);
-    fn compile_var_dec(&self);
+    fn compile_subroutine_var_dec(&mut self) -> Option<Vec<VarDec>>;
+    fn compile_parameter_list(&mut self) -> Option<Vec<Parameters>>;
+    fn compile_subroutine_body(&mut self) -> Option<SubRoutineBody>;
     fn compile_statements(&self);
     fn compile_if_statements(&self);
     fn compile_while_statements(&self);
+    fn compile_type_of(&mut self) -> Option<TypeOf>;
     // helpers
 
     fn get_var_name(&mut self) -> Option<tokenizer::Identifier>;
@@ -215,6 +220,7 @@ impl JackParser<tokenizer::JackTokenizer>{
         };  
         if !token_expected.matches_token(current_token){
             let extra = add_to_err_msg.unwrap_or("");
+
             if report_error{
             self.report_error(format!("unexpected token found expected {:?},\n Line: {},\n {}",token_expected,self.tokenizer.get_line_number(),extra));
             }
@@ -364,22 +370,30 @@ impl Parser for JackParser<tokenizer::JackTokenizer> {
 
 
 
-            let mut class_var_dec:Vec<ClassVarDec> = Vec::new();
+            let mut class_var_decs:Vec<ClassVarDec> = Vec::new();
 
             loop{
                 let Some(var_dec)  = self.compile_class_var_dec()else{
                     break;
                 };
-                class_var_dec.push(var_dec);
+                class_var_decs.push(var_dec);
             }
 
-            let subroutine_dec:SubRoutineDec = self.compile_subroutine().unwrap();
 
-            println!("subroutine: {:?}",subroutine_dec);
+            let mut subroutine_decs:Vec<SubRoutineDec> = Vec::new();
+            loop{
+            let Some(subroutine_dec) = self.compile_subroutine() else{
+                break
+            };
+                subroutine_decs.push(subroutine_dec);
+            }
 
-            let class = Some(Class { class_name:tokenizer::Identifier::SequenceOfChars(self.tokenizer.file_stem_current()), class_var_dec, subroutine_dec: None });
 
 
+
+            println!("subroutine: {:?}",subroutine_decs);
+
+            let class = Some(Class { class_name:tokenizer::Identifier::SequenceOfChars(self.tokenizer.file_stem_current()), class_var_decs, subroutine_decs });
 
 
             println!("class {:?}",class);
@@ -468,14 +482,14 @@ impl Parser for JackParser<tokenizer::JackTokenizer> {
             }
         };
 
-        self.tokenizer.advance_token();
-        self.expected_token(tokenizer::Symbol::LeftParentis, None, true);
 
         let parameters = self.compile_parameter_list();
+        println!("Parameters {:?}",parameters);
 
+        let subroutine_body = self.compile_subroutine_body();
+        // println!("After params, {:?}",self.tokenizer.current_token_type());
 
-
-        Some(SubRoutineDec { return_type, constructor_function_or_method, subroutine_name, parameters: None, subroutine_body: None })
+        Some(SubRoutineDec { return_type, constructor_function_or_method, subroutine_name, parameters, subroutine_body: None })
 
 
     }
@@ -551,35 +565,187 @@ impl Parser for JackParser<tokenizer::JackTokenizer> {
 
 
 
-    fn compile_subroutine_var_dec(&self) {
-        
-    }
-    fn compile_parameter_list(&mut self)-> Option<Parameters> {
+    
+    fn compile_parameter_list(&mut self)-> Option<Vec<Parameters>> {
 
-        let parameters:Parameters;
-
+       
         self.tokenizer.advance_token();
-        // still coding here
+        self.expected_token(tokenizer::Symbol::LeftParentis, None, true);
+
+        let mut parameters:Vec<Parameters> = Vec::new();
+        
+        loop{
+            let mut parameter:Parameters = Parameters { type_of: None, var_name: None };
+            self.tokenizer.advance_token();
+              
+
+            let mut current_token = self.tokenizer.current_token_type().expect("Expected token not end of file");
+
+            if *current_token == tokenizer::Token::SymbolToken(Symbol::Comma){
+                self.tokenizer.advance_token();
+                current_token = self.tokenizer.current_token_type().expect("Expected token not end of file");
+            } 
+           
 
 
-        loop {
-
-         
             
-            
+            if current_token == &tokenizer::Token::SymbolToken(Symbol::RightParentis){
+                break
+            }
+
+            let type_of = self.compile_type_of();
 
 
+            self.tokenizer.advance_token();
+            current_token = self.tokenizer.current_token_type().expect("Expected token not end of file");
+
+             match current_token {
+                SymbolToken(sym) => {
+                    if *sym == Symbol::RightParentis{
+                        self.report_error(String::from("Expected identifier for type"));
+                        break;
+                    }
+                }
+                
+                IdentifierToken(identifier) => {
+                    parameter = Parameters { type_of, var_name: Some(identifier.clone()) };
+                }
+
+                unexpected_token => {
+                    self.report_error(self.format_unexpect_token_err_msg(unexpected_token));
+
+                    return None;
+                }
+            }
+            parameters.push(parameter);
 
         }
+        
 
+        Some(parameters)
+
+    }
+
+
+    fn compile_type_of(&mut self) -> Option<TypeOf>{
+             let current_token = self.tokenizer.current_token_type().expect("Expected token not end of file");
+               match current_token {
+    
+                KeywordToken(keyword) => {
+
+                    if *keyword == Keyword::Int{
+                        return Some(TypeOf::BuiltIn(Keyword::Int))
+                    }
+                    if *keyword == Keyword::Char{
+                        return Some(TypeOf::BuiltIn(Keyword::Char));
+                    }
+
+                    if *keyword == Keyword::Boolean{
+                        return Some(TypeOf::BuiltIn(Keyword::Boolean));
+                    }
+
+                    return None
+                    
+
+                }
+                IdentifierToken(type_name) => {
+
+                    return Some(TypeOf::ClassName(type_name.clone()));
+
+                }
+                unexpected_token => {
+                    self.report_error(self.format_unexpect_token_err_msg(unexpected_token));
+                    return None;
+                }
+            }
+
+    }
+
+
+    fn compile_subroutine_body(&mut self) -> Option<SubRoutineBody> {
+
+        // expect { bracket for beginning of body
+        self.tokenizer.advance_token();
+        self.expected_token(Symbol::LeftCurlyBracket, None,false);
+
+        self.tokenizer.advance_token();
+        
+
+    //    while let Some(current_token ) = self.tokenizer.current_token_type(){
+
+            
+
+            let var_decs = self.compile_subroutine_var_dec();
+
+            println!("Var dec look here {:?}",var_decs);
+
+    //    }
 
         None
+
     }
-    fn compile_subroutine_body(&self) {
-        
-    }
-    fn compile_var_dec(&self) {
-        
+
+
+    fn compile_subroutine_var_dec(&mut self) -> Option<Vec<VarDec>> {
+            
+            println!("current token vec dec{:?}",self.tokenizer.current_token_type());
+
+            let mut var_decs:Vec<VarDec> = Vec::new();
+            loop{
+            let mut var_dec:VarDec = VarDec { type_of: None, optional_more_vars:Vec::new()  };
+            if !self.expected_token(Keyword::Var,None, false){
+                break
+            }
+            self.tokenizer.advance_token();
+            let Some(type_of) = self.compile_type_of()else{
+                self.report_error(String::from("expected type after var keyword"));
+                return None
+            };
+            var_dec.type_of = Some(type_of);
+
+            loop{
+            self.tokenizer.advance_token();
+
+            match self.tokenizer.current_token_type(){
+
+                Some(token) => {
+                    match token{
+                        IdentifierToken(var_name) => {
+                            var_dec.optional_more_vars.push(var_name.clone());
+                        }
+                        SymbolToken(symbol) => {
+                            if symbol == &Symbol::Comma{
+                                continue;
+                            }
+                            if symbol == &Symbol::SemiColon{
+                                // parse through to getting next token as var
+                                self.tokenizer.advance_token();
+                                break;
+                            }
+                            self.report_error(format!("unexpected symbol found {:?}",symbol));
+                        }
+
+                        unexpected_token => {
+                            self.report_error(self.format_unexpect_token_err_msg(unexpected_token));
+                            return None;
+                        }
+                    }
+
+                }
+                None => {
+                    self.report_error(String::from("Expected identifier got EOF"));
+                    
+                    return None
+                }
+
+            }
+            }
+
+            var_decs.push(var_dec);
+            
+            }
+                
+            Some(var_decs)
     }
 
     fn compile_statements(&self) {

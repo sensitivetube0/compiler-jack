@@ -7,6 +7,30 @@ class tttt {
     field int x, y;
     field String label;
 
+
+
+    function void testArrays() {
+        var Array arr penis arry2;
+        var int i;
+        var Array another one;
+        let arr = Array.new(3);
+        let arr[0] = 10;
+        let arr[1] = 20;
+        let arr[2] = 30;
+        
+        let i = 0;
+        while (i < 3) {
+            do Output.printInt(arr[i]);
+            do Output.printString(" ");
+            let i = i + 1;
+        }
+        
+        do arr.dispose();
+        return;
+    }
+
+
+
     constructor tttt new(int ax, int ay, String aLabel) {
         let x = ax;
         let y = ay;
@@ -40,25 +64,7 @@ class tttt {
         return x + y;
     }
 
-    function void testArrays() {
-        var Array arr;
-        var int i;
-        
-        let arr = Array.new(3);
-        let arr[0] = 10;
-        let arr[1] = 20;
-        let arr[2] = 30;
-        
-        let i = 0;
-        while (i < 3) {
-            do Output.printInt(arr[i]);
-            do Output.printString(" ");
-            let i = i + 1;
-        }
-        
-        do arr.dispose();
-        return;
-    }
+    
 
     function void main() {
         var Main instance1, instance2;
