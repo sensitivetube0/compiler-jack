@@ -1,9 +1,8 @@
 use core::panic;
-use std::{any, vec};
-use std::ffi::c_float;
-use std::fmt::{Debug, format};
+use std::{vec};
+use std::fmt::{Debug};
 
-use crate::tokenizer::{self, CanCheckEq, Identifier, Keyword, Symbol, Token, Tokenizer};
+use crate::tokenizer::{self, CanCheckEq, Integer, Keyword, Symbol, Token, Tokenizer};
 use crate::tokenizer::Token::{IdentifierToken,IntegerToken,KeywordToken,StringToken,SymbolToken};
 
 
@@ -83,7 +82,7 @@ pub struct Parameters{
 #[derive(Debug)]
 pub struct SubRoutineBody{
     var_decs:Option<Vec<VarDec>>,
-    statements:Vec<Statements>
+    statements:Option<Vec<Statements>>,
 }
 
 
@@ -112,71 +111,122 @@ enum ReturnType{
 
 // different statementS
 
-#[derive(Debug)]
-struct IfStatement{
+#[derive(Debug,PartialEq)]
+pub struct IfStatement{
     expression:Expression,
     statements:Vec<Statements>
 
 
 }
 
-#[derive(Debug)]
-struct WhileStatement{
+#[derive(Debug,PartialEq)]
+pub struct WhileStatement{
     expression:Expression,
     statements:Vec<Statements>
 }
 
 
-#[derive(Debug)]
-struct DoStatement{
+#[derive(Debug,PartialEq)]
+pub struct DoStatement{
     subroutine_call:tokenizer::Identifier
 }
 
-#[derive(Debug)]
-struct LetStatement{
-    expression_equal:Expression,
+#[derive(Debug,PartialEq)]
+pub struct LetStatement{
+    expression_equal:Option<Expression>,
     index_array:Option<Expression>,
-    var_name:tokenizer::Identifier,
+    var_name:Option<tokenizer::Identifier>,
 }
 
-#[derive(Debug)]
-struct ReturnStatement{
+#[derive(Debug,PartialEq)]
+pub struct ReturnStatement{
     expression:Option<Expression>
 }
 
 
 
 
-#[derive(Debug)]
-enum Statements{
+#[derive(Debug,PartialEq)]
+pub enum Statements{
     
     If(Box<IfStatement>),
     While(Box<WhileStatement>),
     Let(Box<LetStatement>),
     Do(Box<DoStatement>),
     Return(Box<ReturnStatement>),
-
+    None,
 }
 
 
 
 // expressions
-#[derive(Debug)]
-struct Expression{
-    term:Term,
+#[derive(Debug,PartialEq)]
+pub struct Expression{
+    unary_op:Option<Symbol>,
+    left_term:Option<Term>,
+    infix_op:Option<Symbol>,
+    right_term:Option<Term>,
 }
 
-#[derive(Debug)]
-struct Term{
-    term:Vec<tokenizer::Token>,
-    expression_list:Option<ExpressionList>,
-    expression_idx:Option<Box<Expression>>,
-    calling_subroutine:Option<tokenizer::Identifier>    
+
+#[derive(Debug,PartialEq)]
+enum Term {
+    IntegerConstant(i32),
+    StringConstant(String),
+    KeywordConstant(Keywords),
+    Varname(VarConstantInfo),
+    SubRoutineCall(SubRoutineCallInfo)
 }
 
-#[derive(Debug)]
-struct ExpressionList{
-    expressions:Box<Expression>
+#[derive(Debug,PartialEq)]
+enum SubRoutineCallInfo {
+    SubRoutineBracketCall(SubRoutineBracketCallInfo),
+    MethodCall(MethodCallInfo),
+
+}
+
+
+#[derive(Debug,PartialEq)]
+struct MethodCallInfo{
+    called: tokenizer::Identifier,
+    subroutine_name:tokenizer::Identifier,
+    expression_call_with:ExpressionList,
+}   
+
+
+#[derive(Debug,PartialEq)]
+struct SubRoutineBracketCallInfo{
+    subroutine_name:tokenizer::Identifier,
+    expression_call_with:ExpressionList,
+}
+
+
+#[derive(Debug,PartialEq)]
+enum VarConstantInfo {
+    VarDec(tokenizer::Identifier),
+    CallingVarDec(VarDecCalledInfo),
+}
+
+
+#[derive(Debug,PartialEq)]
+struct VarDecCalledInfo{
+    var_name:tokenizer::Identifier,
+    indexing_expression:Box<Expression>
+}
+
+
+#[derive(Debug,PartialEq)]
+enum Keywords {
+    True,
+    False,
+    Null,
+    This
+}
+
+
+#[derive(Debug,PartialEq)]
+pub struct ExpressionList{
+    expressions:Box<Vec<Expression>>
 }
 
 
@@ -190,9 +240,14 @@ pub trait Parser{
     fn compile_subroutine_var_dec(&mut self) -> Option<Vec<VarDec>>;
     fn compile_parameter_list(&mut self) -> Option<Vec<Parameters>>;
     fn compile_subroutine_body(&mut self) -> Option<SubRoutineBody>;
-    fn compile_statements(&mut self) -> Option<Statements>;
-    fn compile_if_statements(&self);
-    fn compile_while_statements(&self);
+    fn compile_statements(&mut self) -> Option<Vec<Statements>>;
+    fn compile_let_statement(&mut self) -> Option<LetStatement>;
+    fn compile_if_statement(&mut self) -> Option<IfStatement>;
+    fn compile_while_statement(&mut self) -> Option<WhileStatement>;
+    fn compile_do_statement(&mut self) -> Option<DoStatement>;
+    fn compile_return_statement(&mut self) -> Option<ReturnStatement>;
+    fn compile_expression(&mut self) -> Option<Expression>;
+    fn compile_expression_for_indexing(&mut self) -> Option<Expression>;
     fn compile_type_of(&mut self) -> Option<TypeOf>;
     // helpers
 
@@ -680,13 +735,8 @@ impl Parser for JackParser<tokenizer::JackTokenizer> {
         let var_decs = self.compile_subroutine_var_dec();
         let statements = self.compile_statements();
 
-
-
-
-
-        
-    
-        Some(SubRoutineBody{var_decs,statements:vec![]})
+        println!("statements, {:?}",statements);
+        Some(SubRoutineBody{var_decs,statements})
 
     }
 
@@ -752,38 +802,186 @@ impl Parser for JackParser<tokenizer::JackTokenizer> {
             Some(var_decs)
     }
 
-    fn compile_statements(&mut self) -> Option<Statements> {
+    fn compile_statements(&mut self) -> Option<Vec<Statements>> {
         
-        let current_token = self.tokenizer.current_token_type().expect("Expected atleast } for subroutine not EOF");
+        let mut statements:Vec<Statements> = Vec::new();
+
+
+        let mut statement:Statements = Statements::None;
+
+        let current_token = self.tokenizer.current_token_type().expect("Expected at least } for subroutine not EOF");
         match current_token{
-            SymbolToken(symbol) => {
-
+            KeywordToken(keyword) => {
+                match keyword{
+                    Keyword::Let => {
+                        if let Some(let_statement) = self.compile_let_statement(){
+                            statement = Statements::Let(Box::new(let_statement));
+                        };
+                    }
+                    Keyword::If => {
+                        if let Some(if_statement) = self.compile_if_statement(){
+                            statement = Statements::If(Box::new(if_statement));
+                        };
+                    }
+                    Keyword::While => {
+                        if let Some(while_statement) = self.compile_while_statement(){
+                            statement = Statements::While(Box::new(while_statement));
+                        };
+                    }
+                    Keyword::Do => {
+                        if let Some(do_statement) = self.compile_do_statement(){
+                            statement = Statements::Do(Box::new(do_statement));
+                        };
+                    }
+                    Keyword::Return => {
+                        if let Some(return_statement) = self.compile_return_statement(){
+                            statement = Statements::Return(Box::new(return_statement));
+                        };
+                    }
+                    _ => {
+                        self.report_error(self.format_unexpect_token_err_msg(current_token));
+                        return None
+                    }
+                }
             }
-            // we are here eventually we will need to go up have the compliation of the subroutines in a loop until last and final }
-            // is found and we can break out and finish class compliation!
-
-
-            
+            SymbolToken(symbol) => {
+                match symbol {
+                    Symbol::LeftCurlyBracket => {
+                        return Some(statements)
+                    }
+                    _ => {
+                        self.report_error(self.format_unexpect_token_err_msg(current_token));
+                        return None
+                    }
+                }
+            }
+            unexpected_token => {
+                    self.report_error(self.format_unexpect_token_err_msg(unexpected_token));
+                    return None
+            }
         }
+       
+        statements.push(statement);
+     
 
 
 
 
+        Some(statements)
+    }
+
+    fn compile_let_statement(&mut self) -> Option<LetStatement> {
+        if !self.expected_token(Keyword::Let,None, true){
+            return None
+        }
+        self.tokenizer.advance_token();
+        let current_token = self.tokenizer.current_token_type().expect("Expected varname after let statement keyword");
+
+        let mut let_statement:LetStatement = LetStatement { expression_equal: None, index_array: None, var_name: None };
+
+        match current_token{
+            IdentifierToken(ident_token) => {
+                let_statement.var_name = Some(ident_token.clone());
+            }
+            unexpected_token => {
+                self.report_error(self.format_unexpect_token_err_msg(unexpected_token));
+                return None
+            }
+        }
+        let expression = self.compile_expression_for_indexing();
+
+
+
+
+
+        Some(let_statement)
+    }
+
+
+    fn compile_if_statement(&mut self) -> Option<IfStatement> {
+        None
+    }
+    fn compile_while_statement(&mut self) -> Option<WhileStatement> {
+        None
+    }
+    fn compile_do_statement(&mut self) -> Option<DoStatement> {
         None
     }
 
-    fn compile_if_statements(&self) {
-        
+    fn compile_return_statement(&mut self) -> Option<ReturnStatement> {
+        None
     }
-    fn compile_while_statements(&self) {
-        
+    
+    fn compile_expression(&mut self) -> Option<Expression> {
+        self.tokenizer.advance_token();
+        let current_token = self.tokenizer.current_token_type().expect("unexpected EOF");
+        let mut expression:Expression = Expression { unary_op: None, left_term: None, infix_op: None, right_term: None };
+        match current_token {
+            IntegerToken(int_identifier) => {
+                let Integer::Integer(int) = int_identifier;
+                expression.left_term = Some(Term::IntegerConstant(*int));
+            }
+            StringToken(string_identifier) => {
+                let tokenizer::StringConstant::String(string) = string_identifier;
+                expression.left_term = Some(Term::StringConstant(string.clone()));
+            }
+            KeywordToken(keyword) => {
+                match keyword{
+                    Keyword::True => {
+                        expression.left_term = Some(Term::KeywordConstant(Keywords::True));
+                    },
+                    Keyword::False => {
+                        expression.left_term = Some(Term::KeywordConstant(Keywords::False));
+                    },
+                    Keyword::Null => {
+                        expression.left_term = Some(Term::KeywordConstant(Keywords::Null));
+                    },
+                    Keyword::This => {
+                        expression.left_term = Some(Term::KeywordConstant(Keywords::This));
+                    }
+                    _ => {
+                    self.report_error(self.format_unexpect_token_err_msg(current_token));
+                    return None
+                    }
+                }
+            }
+
+
+            unexpected_token => {
+                self.report_error(self.format_unexpect_token_err_msg(unexpected_token));
+                return None
+            }
+        }
+        //          pub struct Expression{
+//     unary_op:Option<Symbol>,
+//     left_term:Term,
+//     infix_op:Option<Symbol>,
+//     right_term:Option<Term>,
+// }
+
+
+// #[derive(Debug,PartialEq)]
+// enum Term {
+//     IntegerConstant(u32),
+//     StringConstant(String),
+//     KeywordConstant(Keywords),
+//     Varname(VarConstantInfo),
+//     SubRoutineCall(SubRoutineCallInfo)
+// } 
+        None
+    }
+    fn compile_expression_for_indexing(&mut self) -> Option<Expression> {
+        self.tokenizer.advance_token();
+        self.expected_token(Symbol::LeftSquareBracket, None, true);
+        let expression = self.compile_expression();
+
+        self.tokenizer.advance_token();
+        self.expected_token(Symbol::RightSquareBracket, None, true);
+
+        expression
+       
     }
 
-
-
-
-
-    // helpers
 
 
     fn get_var_name(&mut self) -> Option<tokenizer::Identifier>{

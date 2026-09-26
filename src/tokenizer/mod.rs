@@ -24,7 +24,7 @@ pub trait CanCheckEq{
     fn matches_token(&self,token_type:&Token) -> bool;
 }
 
-#[derive(Debug,PartialEq, Eq)]
+#[derive(Debug,PartialEq, Eq,Clone)]
 pub enum Keyword {
     Class,
     Constructor,
@@ -76,7 +76,7 @@ impl CanCheckEq for Identifier {
 
 
 
-#[derive(Debug,PartialEq, Eq)]
+#[derive(Debug,PartialEq, Eq,Clone)]
 pub enum Symbol{
 
 
@@ -110,7 +110,7 @@ impl CanCheckEq for Symbol {
         }
 }
 
-#[derive(Debug,PartialEq, Eq)]
+#[derive(Debug,PartialEq, Eq,Clone)]
 pub enum Integer{
     Integer(i32), // stores the integer
 }
@@ -129,13 +129,13 @@ impl CanCheckEq for Integer {
 }
 
 
-#[derive(Debug,PartialEq)]
+#[derive(Debug,PartialEq,Clone)]
 pub enum StringConstant{
     String(String), // needs to store the String constant
 }
 
 // holds Token of all the different enums
-#[derive(Debug,PartialEq)]
+#[derive(Debug,PartialEq,Clone)]
 pub enum Token{
     KeywordToken(Keyword),
     SymbolToken(Symbol),
