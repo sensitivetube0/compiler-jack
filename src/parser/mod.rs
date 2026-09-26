@@ -82,7 +82,7 @@ pub struct Parameters{
 
 #[derive(Debug)]
 pub struct SubRoutineBody{
-    var_dec:VarDec,
+    var_decs:Option<Vec<VarDec>>,
     statements:Vec<Statements>
 }
 
@@ -144,14 +144,20 @@ struct ReturnStatement{
     expression:Option<Expression>
 }
 
+
+
+
 #[derive(Debug)]
 enum Statements{
     
     If(Box<IfStatement>),
     While(Box<WhileStatement>),
     Let(Box<LetStatement>),
+    Do(Box<DoStatement>),
+    Return(Box<ReturnStatement>),
 
 }
+
 
 
 // expressions
@@ -184,7 +190,7 @@ pub trait Parser{
     fn compile_subroutine_var_dec(&mut self) -> Option<Vec<VarDec>>;
     fn compile_parameter_list(&mut self) -> Option<Vec<Parameters>>;
     fn compile_subroutine_body(&mut self) -> Option<SubRoutineBody>;
-    fn compile_statements(&self);
+    fn compile_statements(&mut self) -> Option<Statements>;
     fn compile_if_statements(&self);
     fn compile_while_statements(&self);
     fn compile_type_of(&mut self) -> Option<TypeOf>;
@@ -391,8 +397,6 @@ impl Parser for JackParser<tokenizer::JackTokenizer> {
 
 
 
-            println!("subroutine: {:?}",subroutine_decs);
-
             let class = Some(Class { class_name:tokenizer::Identifier::SequenceOfChars(self.tokenizer.file_stem_current()), class_var_decs, subroutine_decs });
 
 
@@ -484,12 +488,11 @@ impl Parser for JackParser<tokenizer::JackTokenizer> {
 
 
         let parameters = self.compile_parameter_list();
-        println!("Parameters {:?}",parameters);
 
         let subroutine_body = self.compile_subroutine_body();
-        // println!("After params, {:?}",self.tokenizer.current_token_type());
+     
 
-        Some(SubRoutineDec { return_type, constructor_function_or_method, subroutine_name, parameters, subroutine_body: None })
+        Some(SubRoutineDec { return_type, constructor_function_or_method, subroutine_name, parameters, subroutine_body })
 
 
     }
@@ -668,27 +671,28 @@ impl Parser for JackParser<tokenizer::JackTokenizer> {
         self.tokenizer.advance_token();
         self.expected_token(Symbol::LeftCurlyBracket, None,false);
 
+
+        // compile_subroutine_var_dec expects token to be var!
         self.tokenizer.advance_token();
         
 
-    //    while let Some(current_token ) = self.tokenizer.current_token_type(){
+        // compile_subroutine var_dec_will leave last token to be whatever is after the last var dec
+        let var_decs = self.compile_subroutine_var_dec();
+        let statements = self.compile_statements();
 
-            
 
-            let var_decs = self.compile_subroutine_var_dec();
 
-            println!("Var dec look here {:?}",var_decs);
 
-    //    }
 
-        None
+        
+    
+        Some(SubRoutineBody{var_decs,statements:vec![]})
 
     }
 
 
     fn compile_subroutine_var_dec(&mut self) -> Option<Vec<VarDec>> {
             
-            println!("current token vec dec{:?}",self.tokenizer.current_token_type());
 
             let mut var_decs:Vec<VarDec> = Vec::new();
             loop{
@@ -748,8 +752,24 @@ impl Parser for JackParser<tokenizer::JackTokenizer> {
             Some(var_decs)
     }
 
-    fn compile_statements(&self) {
+    fn compile_statements(&mut self) -> Option<Statements> {
         
+        let current_token = self.tokenizer.current_token_type().expect("Expected atleast } for subroutine not EOF");
+        match current_token{
+            SymbolToken(symbol) => {
+
+            }
+            // we are here eventually we will need to go up have the compliation of the subroutines in a loop until last and final }
+            // is found and we can break out and finish class compliation!
+
+
+            
+        }
+
+
+
+
+        None
     }
 
     fn compile_if_statements(&self) {

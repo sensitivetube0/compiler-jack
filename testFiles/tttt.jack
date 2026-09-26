@@ -10,7 +10,7 @@ class tttt {
 
 
     function void testArrays() {
-        var Array arr penis arry2;
+        var Array arr cool arry2;
         var int i;
         var Array another one;
         let arr = Array.new(3);
